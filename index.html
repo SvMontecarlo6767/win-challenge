@@ -557,7 +557,7 @@ addEventListener("pointerdown",e=>{ const c=e.target.closest&&e.target.closest("
 ["pointerup","pointercancel"].forEach(t=>addEventListener(t,e=>{ if(TC&&e.pointerType!=="mouse"){ tiltOff(TC); TC=null; } },{passive:true}));
 
 // ====== 3D-BÜHNE (three.js) ======
-const H3={}, PT={x:0,y:0};
+const H3={}, PT={x:0,y:0}, ROT=Math.PI/2;
 function h3init(){
   if(H3.ok!==undefined) return H3.ok;
   if(!window.THREE) return false;
@@ -576,7 +576,7 @@ function h3init(){
     const root=new T.Group(); sc.add(root);
     // Chip mit Hirsch-Logo
     const tex=new T.TextureLoader().load(LOGO), texB=new T.TextureLoader().load(LOGO);
-    texB.wrapS=T.RepeatWrapping; texB.repeat.x=-1;
+    [tex,texB].forEach(x=>{ x.center.set(.5,.5); x.rotation=ROT; });
     const ec=document.createElement("canvas"); ec.width=512; ec.height=32; const eg=ec.getContext("2d");
     for(let i=0;i<24;i++){ eg.fillStyle=i%2?"#0b2a1f":"#e7cf8a"; eg.fillRect(i*512/24,0,512/24+1,32); }
     const chip=new T.Mesh(new T.CylinderGeometry(1,1,.18,72),[new T.MeshPhongMaterial({map:new T.CanvasTexture(ec),shininess:70}),new T.MeshPhongMaterial({map:tex,shininess:40,specular:0x222222,color:0xcccccc}),new T.MeshPhongMaterial({map:texB,shininess:40,specular:0x222222,color:0xcccccc})]);
@@ -601,10 +601,10 @@ function h3init(){
     const N=260, pos=new Float32Array(N*3); for(let i=0;i<N;i++){ pos[i*3]=(Math.random()-.5)*10; pos[i*3+1]=(Math.random()-.5)*7; pos[i*3+2]=(Math.random()-.5)*5-1; }
     const pg=new T.BufferGeometry(); pg.setAttribute("position",new T.BufferAttribute(pos,3));
     const dust=new T.Points(pg,new T.PointsMaterial({color:0xffe08a,size:.045,transparent:true,opacity:.85,blending:T.AdditiveBlending,depthWrite:false})); sc.add(dust);
-    Object.assign(H3,{T,r,sc,cam,root,cg,segG,sweep,gold,winM,track,suits,dust,spin:.7,vals:null,shown:null,lt:0});
+    Object.assign(H3,{T,r,sc,cam,root,cg,segG,sweep,gold,winM,track,suits,dust,ang:0,vel:0,vals:null,shown:null,lt:0});
     r.domElement.addEventListener("pointermove",e=>{ const b=r.domElement.getBoundingClientRect(); PT.x=(e.clientX-b.left)/b.width*2-1; PT.y=(e.clientY-b.top)/b.height*2-1; });
     r.domElement.addEventListener("pointerleave",()=>{ PT.x=PT.y=0; });
-    r.domElement.addEventListener("pointerdown",()=>{ H3.spin=16; sfx("coin"); buzz(12);
+    r.domElement.addEventListener("pointerdown",()=>{ H3.vel=18; sfx("coin"); buzz(12);
       if(!H3.ori&&window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission) DeviceOrientationEvent.requestPermission().catch(()=>{}); H3.ori=1; });
     addEventListener("deviceorientation",e=>{ if(e.gamma==null) return; PT.x=Math.max(-1,Math.min(1,e.gamma/30)); PT.y=Math.max(-1,Math.min(1,(e.beta-45)/30)); });
     addEventListener("resize",h3size);
@@ -638,7 +638,7 @@ function h3loop(t){
   s.segs.forEach((x,i)=>{ const to=v.segs[i]; if(Math.abs(to.p-x.p)>.05){ x.p+=(to.p-x.p)*.06; ch=true; } else if(x.p!==to.p){ x.p=to.p; ch=true; } if(x.win!==to.win&&x.p>=to.p-.5){ x.win=to.win; ch=true; } });
   if(Math.abs(v.tot-s.tot)>.05){ s.tot+=(v.tot-s.tot)*.06; ch=true; } else if(s.tot!==v.tot){ s.tot=v.tot; ch=true; }
   if(ch||!H3.segG.children.length) h3build(s);
-  H3.spin+=(.7-H3.spin)*.025; H3.cg.rotation.y+=H3.spin*dt; H3.cg.position.y=Math.sin(t/900)*.07;
+  H3.ang+=H3.vel*dt; H3.vel*=.965; if(H3.vel<1.2){ H3.vel=0; const tg=Math.round(H3.ang/(Math.PI*2))*Math.PI*2+Math.sin(t/1800)*.38; H3.ang+=(tg-H3.ang)*.05; } H3.cg.rotation.y=H3.ang; H3.cg.position.y=Math.sin(t/900)*.07;
   H3.root.rotation.x+=((-.2+PT.y*.3)-H3.root.rotation.x)*.05; H3.root.rotation.y+=((PT.x*.45+Math.sin(t/2600)*.15)-H3.root.rotation.y)*.05;
   H3.segG.children.forEach(m=>{ if(m.userData.gem){ m.rotation.y+=dt*2; m.rotation.x+=dt; } });
   H3.sweep.position.set(Math.cos(t/1300)*4,Math.sin(t/1700)*2.2,3);
@@ -656,7 +656,7 @@ function h3snap(px){
   const v=h3data(); H3.vals=v; H3.shown=JSON.parse(JSON.stringify(v)); h3build(v);
   const r=H3.r, pr=r.getPixelRatio(), asp=H3.cam.aspect, z=H3.cam.position.z, rot=[H3.root.rotation.x,H3.root.rotation.y,H3.cg.rotation.y];
   r.setPixelRatio(1); r.setSize(px,px,false); H3.cam.aspect=1; H3.cam.position.z=7.6; H3.cam.updateProjectionMatrix();
-  H3.root.rotation.set(-.22,.28,0); H3.cg.rotation.y=.55; r.render(H3.sc,H3.cam);
+  H3.root.rotation.set(-.2,.22,0); H3.cg.rotation.y=.18; r.render(H3.sc,H3.cam);
   const c=document.createElement("canvas"); c.width=c.height=px; c.getContext("2d").drawImage(r.domElement,0,0,px,px);
   r.setPixelRatio(pr); H3.cam.aspect=asp; H3.cam.position.z=z; H3.cam.updateProjectionMatrix(); [H3.root.rotation.x,H3.root.rotation.y,H3.cg.rotation.y]=rot;
   const host=$("#stage"); if(host&&host.contains(r.domElement)) r.setSize(host.clientWidth,host.clientHeight); else r.setSize(1,1);
